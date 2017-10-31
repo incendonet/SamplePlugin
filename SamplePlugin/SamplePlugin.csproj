@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <RootNamespace>Incendonet.Plugins.SamplePlugin</RootNamespace>
+    <AssemblyName>Incendonet.Plugins.SamplePlugin</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql" Version="3.2.5" />
+  </ItemGroup>
+
+</Project>

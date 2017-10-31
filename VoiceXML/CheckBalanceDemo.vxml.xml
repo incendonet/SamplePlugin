@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="utf-8"?>
+	<vxml version="2.0" lang="en-US">
+<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+<!-- CheckBalanceDemo.vxml.xml																	-->
+<!--																						-->
+<!--																						-->
+<!-- Copyright 2017, Incendonet Inc.  All rights reserved									-->
+<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+<!--																						-->
+<!--																						-->
+<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+<property name="completetimeout"	value="1s" />
+<property name="interdigittimeout"	value="3s" />
+<property name="termchar"			value="#" />
+
+<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+<!-- Document variables																		-->
+<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+<var name="oNumberFormatter" expr = "" />
+<var name="oStringHelperSipFormatter" expr="" />
+<var name="oCustomers" expr="" />
+
+<var name="sCalledDID" expr="" />
+<var name="sCallerID" expr="" />
+<var name="sCallerIDTTS" expr="" />
+
+<!-- App specific variables -->
+<var name="bSuccess" expr="true" />
+<var name="sFirstName" expr="" />
+<var name="sTotalDue" expr="" />
+<var name="sDueDate" expr="" />
+<var name="sCustomerServiceExtension" expr="1006" />
+
+<!-- Constants -->
+<var name="sApplicationName" expr="CheckBalanceDemo" />
+
+<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+<form id = "Setup">
+	<block>
+		<log>var logData={"Type" : "Demo-state", "SchemaVer" : "0.3", "Application" : "<value expr="sApplicationName" />", "Language" : "en-US", "State" : "SessionStart", "Form" : "Setup"}</log>
+			
+		<script>
+			oNumberFormatter = new Incendonet.Utilities.StringHelper.NumberFormatter();
+			oStringHelperSipFormatter = new Incendonet.Utilities.StringHelper.SipFormatter();
+
+			sCallerID = oStringHelperSipFormatter.GetUsernameFromUri(session.connection_originator);
+			sCalledDID = oStringHelperSipFormatter.GetUsernameFromUri(session.connection_local_uri);
+		</script>
+
+		<log>var logData={"Type" : "Demo-state", "SchemaVer" : "0.3", "Application" : "<value expr="sApplicationName" />", "Language" : "en-US", "State" : "Data", "Form" : "Setup", "Parameters" : {"CallerID" : "<value expr="sCallerID" />"}}</log>
+
+		<goto next="#VerifyCallerid" />
+	</block>
+	
+	<field name="FieldStub"></field>
+</form>
+
+
+<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+<form id = "VerifyCallerid">
+	<block>
+		<log>var logData={"Type" : "Demo-state", "SchemaVer" : "0.3", "Application" : "<value expr="sApplicationName" />", "Language" : "en-US", "State" : "Data", "Form" : "VerifyCallerid"}</log>
+
+		<script>
+			sCallerIDTTS = oNumberFormatter.SpacifyPhoneNumber(sCallerID);
+		</script>
+			
+		<prompt bargein="true">
+			<audio>Hi, I see you're calling from </audio>
+			<audio><value expr="sCallerIDTTS" /></audio>
+			<audio src="/opt/speechbridge/VoiceDocStore/Prompts/Silence-05sec.wav"></audio>
+			<audio>Is this the phone number associated with your account?</audio>
+		</prompt>
+	</block>
+	<field name="CallerInput">
+		<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+		<!-- Field options																			-->
+		<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+		<grammar type="application/srgs" src="file:///opt/speechbridge/VoiceDocStore/ABNFBoolean.gram" />
+		<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+		<!-- Field responses																		-->
+		<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+		<filled>
+			<if cond="CallerInput == 'true'">
+				<goto next="#LookupAccountInfo" />
+			<elseif cond="CallerInput == '1'" />
+				<goto next="#LookupAccountInfo" />
+			<elseif cond="CallerInput == 'false'" />
+				<goto next="#TransferToCustomerService" />
+			<elseif cond="CallerInput == '2'" />
+				<goto next="#TransferToCustomerService" />
+			<else />
+				<goto next="#VerifyCallerid" />
+			</if>
+		</filled>
+	</field>
+</form>
+
+	
+<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+<form id = "LookupAccountInfo">
+	<block>
+		<log>var logData={"Type" : "Demo-state", "SchemaVer" : "0.3", "Application" : "<value expr="sApplicationName" />", "Language" : "en-US", "State" : "Start", "Form" : "LookupAccountInfo"}</log>
+
+		<script>
+			oCustomers = new Incendonet.Plugins.SamplePlugin.Customers();
+			oCustomers.Init();
+			bSuccess = oCustomers.FindByPhonenum(sCallerID);
+		</script>
+
+		<goto next="#ReadAccountInfo" />
+	</block>
+	
+	<field name="FieldStub"></field>
+</form>
+
+
+<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+<form id = "ReadAccountInfo">
+	<block>
+		<log>var logData={"Type" : "Demo-state", "SchemaVer" : "0.3", "Application" : "<value expr="sApplicationName" />", "Language" : "en-US", "State" : "Start", "Form" : "ReadAccountInfo"}</log>
+
+		<if cond="bSuccess == 'false'">
+			<goto next="#TransferToCustomerService" />
+		<else />
+			<script>
+				sFirstName = oCustomers.GetFirstName();
+				sTotalDue = oCustomers.GetBalance();
+				sDueDate = oCustomers.GetDueDate();
+			</script>
+			<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+			<!-- Form intro prompt																		-->
+			<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+			<prompt bargein="true">
+				<audio><value expr="sFirstName" /></audio>
+				<audio>Your current balance is</audio>
+				<audio><value expr="sTotalDue" /></audio>
+				<audio>and due on</audio>
+				<audio><value expr="sDueDate" /></audio>
+				<audio src="/opt/speechbridge/VoiceDocStore/Prompts/Silence-05sec.wav"></audio>
+				<audio>Is there anything else we can help you with?</audio>
+			</prompt>
+		</if>
+	</block>
+	
+	<field name="CallerInput">
+		<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+		<!-- Field options																			-->
+		<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+		<grammar type="application/srgs" src="file:///opt/speechbridge/VoiceDocStore/ABNFBoolean.gram" />
+
+		<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+		<!-- Field responses																		-->
+		<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+		<filled>
+			<if cond="CallerInput == 'true'">
+				<goto next="#TransferToCustomerService" />
+			<elseif cond="CallerInput == '1'" />
+				<goto next="#TransferToCustomerService" />
+			<elseif cond="CallerInput == 'false'" />
+				<prompt bargein="false">
+					<audio>Great!  Have a wonderfull day!</audio>
+				</prompt>
+				<exit/>
+			<elseif cond="CallerInput == '2'" />
+				<prompt bargein="false">
+					<audio>Great!  Have a wonderfull day!</audio>
+				</prompt>
+				<exit/>
+			<else />
+				<goto next="#CallerInput" />
+			</if>
+		</filled>
+	</field>
+</form>
+
+
+<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	-->
+<form id = "TransferToCustomerService">
+	<block>
+		<log>var logData={"Type" : "Demo-state", "SchemaVer" : "0.3", "Application" : "<value expr="sApplicationName" />", "Language" : "en-US", "State" : "Start", "Form" : "TransferToCustomerService"}</log>
+
+		<if cond="document.sCustomerServiceExtension == ''">
+			<prompt bargein="false">
+				<audio>Please call back another time.</audio>
+			</prompt>
+			<exit/>
+		<else/>
+			<transfer dest="sip:document.sCustomerServiceExtension">
+				<prompt bargein="false">
+					<audio>Please stay on the line while I transfer you to someone who can better assist you.</audio>
+				</prompt>
+			</transfer>
+		</if>
+	</block>
+
+	<field name="FieldStub"></field>
+</form>
+
+</vxml>
